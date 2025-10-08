@@ -20,5 +20,5 @@ spec:
               service:
                 name: ${APP_NAME}
                 port:
-                  number: |-
+                  number: 
                    ${APP_PORT}
