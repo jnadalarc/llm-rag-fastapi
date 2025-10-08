@@ -8,7 +8,6 @@ from rag_handler import RAGManager
 from llm_handler import LLMHandler # <-- Importem el nou handler
 
 # --- Configuració Centralitzada ---
-# Eliminem OLLAMA_HOST i afegim MODEL_PATH
 MODEL_PATH = os.getenv("MODEL_PATH", "/data/models/model_1.gguf") # <-- Posa el nom del teu model
 DOCS_DIR = Path(os.getenv("DOCS_DIR", "/data/documents")).resolve()
 RAG_DB_PATH = Path(os.getenv("RAG_DB_PATH", "/data/index/rag.db")).resolve()
