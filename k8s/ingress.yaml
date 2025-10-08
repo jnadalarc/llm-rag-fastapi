@@ -1,8 +1,7 @@
-# k8s/ingress.template.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ${APP_NAME}
+  name: llm-rag-app
   annotations:
     nginx.ingress.kubernetes.io/limit-rpm: "20"
     nginx.ingress.kubernetes.io/limit-rps: "2"
@@ -11,14 +10,13 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: ${APP_NAME}.local
+    - host: "llm-rag-app.local" # Per al servidor, canvia-ho pel teu domini real
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: ${APP_NAME}
+                name: llm-rag-app
                 port:
-                  number: 
-                   ${APP_PORT}
+                  number: 8000
