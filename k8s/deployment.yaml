@@ -1,0 +1,63 @@
+# Script complet
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-rag-app
+spec:
+  selector:
+    matchLabels:
+      app: llm-rag-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: llm-rag-app
+    spec:
+      containers:
+        - image: registry.watttega.com/test/llm-rag-app:latest
+          imagePullPolicy: Always
+          name: llm-rag-app
+          ports:
+            - containerPort: 8000
+              name: 8000tcp
+              protocol: TCP
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "2000m"
+            limits:
+              memory: "16Gi"
+              cpu: "4000m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          volumeMounts:
+            - mountPath: "/data/documents"
+              name: docs-storage
+            - mountPath: "/data/models"
+              name: models-storage
+            - mountPath: "/data/index"
+              name: index-storage
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: registry-watttega-secret
+      restartPolicy: Always
+      volumes:
+        - name: docs-storage
+          persistentVolumeClaim:
+            claimName: rag-docs-pvc
+        - name: models-storage
+          persistentVolumeClaim:
+            claimName: rag-models-pvc
+        - name: index-storage
+          persistentVolumeClaim:
+            claimName: rag-index-pvc

@@ -1,0 +1,14 @@
+# Script complet
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-rag-app
+spec:
+  type: ClusterIP
+  ports:
+    - name: 8000tcp
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+  selector:
+    app: llm-rag-app
