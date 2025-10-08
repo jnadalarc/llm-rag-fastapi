@@ -9,7 +9,7 @@ jobs:
   build-and-push:
     runs-on: self-hosted
     outputs: 
-      tag: ${{ steps.date.outputs.tag }}
+      tag: ${{ steps.tagger.outputs.tag }} # Exportem el tag generat en aquest job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,22 +24,25 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Get current date as tag
-        id: date # <-- Important: L'identificador del pas
+      - name: Generate image tag
+        id: tagger # Donem un ID al pas per referenciar la seva sortida
         run: |
           TAG=$(date +'%Y%m%d%H%M%S')
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT # <-- NOU: Declarem la sortida
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
-        run: |
-          make push TAG=${{ env.TAG }}
-        env:
-          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+        uses: docker/build-push-action@v5 # <-- CANVI: Utilitzem l'acció estàndard de Docker
+        with:
+          context: .
+          push: true
+          # Creem dues etiquetes: una amb la data i una 'latest'
+          tags: |
+            registry.wattega.com/test/llm-rag-app:${{ steps.tagger.outputs.tag }}
+            registry.wattega.com/test/llm-rag-app:latest
 
   deploy-to-k3s:
     runs-on: self-hosted
-    needs: build-and-push # Aquest job depèn de l'anterior i de la seva sortida
+    needs: build-and-push # Aquest job depèn de l'anterior
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,10 +53,17 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
       
-      
       - name: Deploy to K3s cluster
         run: |
-          # Utilitzem l'etiqueta que ens ve del job anterior
-          make deploy TAG=${{ needs.build-and-push.outputs.tag }}
-        env:
-          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          # CANVI: Utilitzem comandes kubectl directament en lloc de 'make'
+          echo "--- Aplicant configuracions estàtiques (servei, ingress, etc.) ---"
+          kubectl apply -f k8s/pv-pvc.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
+
+          echo "--- Actualitzant el Deployment amb la nova imatge ---"
+          # La comanda 'kubectl set image' actualitza la imatge del contenidor sense modificar el fitxer YAML
+          kubectl set image deployment/llm-rag-app llm-rag-app=registry.wattega.com/test/llm-rag-app:${{ needs.build-and-push.outputs.tag }}
+
+          echo "--- Verificant l'estat del desplegament ---"
+          kubectl rollout status deployment/llm-rag-app
