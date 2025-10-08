@@ -18,8 +18,8 @@ spec:
           imagePullPolicy: Always
           name: llm-rag-app
           ports:
-            - containerPort: 8000
-              name: 8000tcp
+            - containerPort: ${APP_PORT}
+              name: ${APP_PORT}tcp
               protocol: TCP
           resources:
             requests:
