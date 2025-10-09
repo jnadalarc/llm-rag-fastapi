@@ -43,35 +43,41 @@ jobs:
             registry.wattega.com/test/llm-rag-app:${{ steps.tagger.outputs.tag }}
             registry.wattega.com/test/llm-rag-app:latest
   
-  deploy:
-    name: Deploy to K3s
-    needs: [build]
-    runs-on: [self-hosted]
+deploy-to-k3s:
+    runs-on: self-hosted
+    needs: build-and-push
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set Kubeconfig
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
-
-      - name: Substitute variables and deploy
-        # Passem el tag del job anterior com a variable d'entorn
-        env:
-          IMAGE_TAG: registry.wattega.com/test/llm-rag-app:${{ needs.build.outputs.tag }}
-          APP_NAME: ${{ env.APP_NAME }}
-          APP_PORT: ${{ env.APP_PORT }}
+      
+      # --- PAS NOU AFEGIT ---
+      - name: Create or Update Kubernetes Registry Secret
         run: |
-          echo "--- Generant fitxers de desplegament des de les plantilles ---"
-          envsubst < ./k3s/app-deployment.yaml.template > ./k3s/app-deployment.yaml
-          envsubst < ./k3s/app-service.yaml.template > ./k3s/app-service.yaml
-          envsubst < ./k3s/app-ingress.yaml.template > ./k3s/app-ingress.yaml
+          # Esborra el secret si ja existeix, ignorant l'error si no existeix
+          kubectl delete secret registry-watttega-secret --ignore-not-found
 
-          echo "--- Desplegant a K3s ---"
-          # Apliquem tots els fitxers de la carpeta, inclosos els generats i el pv-pvc.yaml
-          kubectl apply -f ./k3s/
+          # Crea el secret de nou amb les credencials fresques de GitHub Secrets
+          kubectl create secret docker-registry registry-watttega-secret \
+            --docker-server=registry.wattega.com \
+            --docker-username=${{ secrets.REGISTRY_USERNAME }} \
+            --docker-password=${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Deploy to K3s cluster
+        run: |
+          echo "--- Aplicant totes les configuracions de K3s ---"
+          kubectl apply -f k8s/
+
+          echo "--- Esperant que el Deployment sigui creat... ---"
+          sleep 10
+
+          echo "--- Actualitzant el Deployment amb la nova imatge ---"
+          kubectl set image deployment/llm-rag-app llm-rag-app=registry.wattega.com/test/llm-rag-app:${{ needs.build-and-push.outputs.tag }}
 
           echo "--- Verificant l'estat del desplegament ---"
-          kubectl rollout status deployment/${{ env.APP_NAME }}
+          kubectl rollout status deployment/llm-rag-app
