@@ -43,41 +43,41 @@ jobs:
             registry.wattega.com/test/llm-rag-app:${{ steps.tagger.outputs.tag }}
             registry.wattega.com/test/llm-rag-app:latest
   
-deploy-to-k3s:
-    runs-on: self-hosted
-    needs: build-and-push
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  deploy-to-k3s:
+      runs-on: self-hosted
+      needs: build
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v4
 
-      - name: Set Kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-      
-      # --- PAS NOU AFEGIT ---
-      - name: Create or Update Kubernetes Registry Secret
-        run: |
-          # Esborra el secret si ja existeix, ignorant l'error si no existeix
-          kubectl delete secret registry-watttega-secret --ignore-not-found
+        - name: Set Kubeconfig
+          run: |
+            mkdir -p $HOME/.kube
+            echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+            chmod 600 $HOME/.kube/config
+        
+        # --- PAS NOU AFEGIT ---
+        - name: Create or Update Kubernetes Registry Secret
+          run: |
+            # Esborra el secret si ja existeix, ignorant l'error si no existeix
+            kubectl delete secret registry-watttega-secret --ignore-not-found
 
-          # Crea el secret de nou amb les credencials fresques de GitHub Secrets
-          kubectl create secret docker-registry registry-watttega-secret \
-            --docker-server=registry.wattega.com \
-            --docker-username=${{ secrets.REGISTRY_USERNAME }} \
-            --docker-password=${{ secrets.REGISTRY_PASSWORD }}
+            # Crea el secret de nou amb les credencials fresques de GitHub Secrets
+            kubectl create secret docker-registry registry-watttega-secret \
+              --docker-server=registry.wattega.com \
+              --docker-username=${{ secrets.REGISTRY_USERNAME }} \
+              --docker-password=${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Deploy to K3s cluster
-        run: |
-          echo "--- Aplicant totes les configuracions de K3s ---"
-          kubectl apply -f k8s/
+        - name: Deploy to K3s cluster
+          run: |
+            echo "--- Aplicant totes les configuracions de K3s ---"
+            kubectl apply -f k8s/
 
-          echo "--- Esperant que el Deployment sigui creat... ---"
-          sleep 10
+            echo "--- Esperant que el Deployment sigui creat... ---"
+            sleep 10
 
-          echo "--- Actualitzant el Deployment amb la nova imatge ---"
-          kubectl set image deployment/llm-rag-app llm-rag-app=registry.wattega.com/test/llm-rag-app:${{ needs.build-and-push.outputs.tag }}
+            echo "--- Actualitzant el Deployment amb la nova imatge ---"
+            kubectl set image deployment/llm-rag-app llm-rag-app=registry.wattega.com/test/llm-rag-app:${{ needs.build-and-push.outputs.tag }}
 
-          echo "--- Verificant l'estat del desplegament ---"
-          kubectl rollout status deployment/llm-rag-app
+            echo "--- Verificant l'estat del desplegament ---"
+            kubectl rollout status deployment/llm-rag-app
